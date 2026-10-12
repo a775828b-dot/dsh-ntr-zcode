@@ -1,0 +1,9 @@
+node_modules/
+test/isolated-*/
+test/*.png
+*.tgz
+dist/
+.env
+.env.*
+*.log
+.references/

@@ -1,0 +1,15 @@
+Dsh ntr Zcode
+Copyright 2026 Dsh ntr Zcode contributors
+
+Independent experimental adapter; not affiliated with or endorsed by Z.AI or DeepSeek.
+
+lib/zcode-wire.js is a generated subset of ZCode transport, RPC and validation
+sources, bundled with esbuild and a local import/export shim. Upstream repository:
+https://github.com/zai-org/ZCode
+Pinned commit: aac4755666d09fdcd70272fcf063c077a639015f
+Copyright 2026 Z.AI Co., Ltd. Licensed under Apache-2.0.
+See licenses/ZCode-LICENSE, licenses/ZCode-THIRD-PARTY-NOTICES.md and
+licenses/upstream.json for upstream notices and source provenance.
+
+Bundled Zod retains its MIT license at licenses/Zod-LICENSE.
+Other installed dependencies retain their own licenses.
