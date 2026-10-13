@@ -1,6 +1,6 @@
 {
   "name": "dsh-ntr-zcode",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Dsh ntr Zcode - ZCode remote web protocol adapter for the existing DSH Host",
   "type": "module",
   "main": "lib/index.js",

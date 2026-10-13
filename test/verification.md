@@ -1,11 +1,25 @@
-# Verification: Dsh ntr Zcode 0.4.0
+# Verification: Dsh ntr Zcode 0.4.1
 
 DSH: 0.2.0-rc.2. ZCode protocol reference:
 `aac4755666d09fdcd70272fcf063c077a639015f`.
 
+## Current Audit Status
+
+The strict `--history` regression now passes: a desktop rename reaches both the
+home list and conversation header, including reopen, paging and compaction.
+The extended suite also verifies a rename while pinned, without changing Host membership.
+See [the 0.4.1 button audit](audit-0.4.1.md) for unsupported and unverified controls.
+This audit does not certify full button parity or readiness for a stable release.
+
+Latest checks: `npm test` covers 66 cases. `--flows --audit`, `--history` and
+`--extended` passed against Google Chrome and the original hosted web page, with
+no uncaught page exceptions. Draft cleanup archives only owned, unused sessions
+and leaves an existing blank fixture untouched. Theme validation includes the
+upstream `zai-light` and `zai-dark` values. Image coverage is recorded in the audit.
+
 ## Passed
 
-- `npm test`: 52/52 tests, including scope isolation, concurrent command deduplication,
+- `npm test`: 66/66 tests, including scope isolation, concurrent command deduplication,
   unsupported input rejection, removed-session access revocation, delayed response
   cancellation, asynchronous snapshot failure handling and credential rotation.
 - `node test/real-host.mjs --live`: original `zcode.z.ai/remote/v4` page and official

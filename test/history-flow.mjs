@@ -8,6 +8,9 @@ export async function historyFlow({ desktop, mobile }) {
   await mobile.getByRole('button', { name: '返回任务首页', exact: true }).click();
   await mobile.getByRole('button', { name: /^NTR Long History/ }).click({ timeout: 15000 });
   await mobile.getByText('NTR history marker 229', { exact: true }).waitFor({ timeout: 15000 });
+  const current = await desktop.evaluate(async id => (await fetch(`/api/plugins/ntr-test/history?sessionId=${encodeURIComponent(id)}`)).json(), seed.sessionId);
+  console.log('HISTORY_HOST_TITLE', current.first.value.projections.values.title);
+  await mobile.getByRole('heading', { name: 'NTR Long History', exact: true }).waitFor({ timeout: 10000 });
   await mobile.getByRole('main').hover();
   for (let i = 0; i < 20; i++) {
     await mobile.mouse.wheel(0, -20000);
@@ -15,6 +18,7 @@ export async function historyFlow({ desktop, mobile }) {
     if (await mobile.getByText('NTR history marker 000', { exact: true }).isVisible()) break;
   }
   await mobile.getByText('NTR history marker 000', { exact: true }).waitFor({ timeout: 15000 });
+  await mobile.getByRole('heading', { name: 'NTR Long History', exact: true }).waitFor({ timeout: 10000 });
   console.log('PASS_HISTORY_230_REAL_MESSAGES');
   await mobile.screenshot({ path: 'test/history-mobile.png', fullPage: true });
   await mobile.locator('[contenteditable=true]').first().fill('/compact');
@@ -26,6 +30,8 @@ export async function historyFlow({ desktop, mobile }) {
     if (result.first.value.records.some(r => r.event?.type === 'user/message' && r.event.data.source.kind === 'compact-checkpoint')) break;
   }
   assert(result.first.value.records.some(r => r.event?.type === 'user/message' && r.event.data.source.kind === 'compact-checkpoint'));
+  console.log('HISTORY_TITLE_AFTER_COMPACT', result.first.value.projections.values.title);
+  await mobile.getByRole('heading', { name: 'NTR Long History', exact: true }).waitFor({ timeout: 10000 });
   console.log('PASS_COMPACTION_DURABLE_CHECKPOINT');
   console.log('COMPACT_UI', await mobile.locator('body').ariaSnapshot());
 }

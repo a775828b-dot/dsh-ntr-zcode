@@ -4,7 +4,11 @@
 
 通过 ZCode 原版移动网页，在手机浏览器访问 DeepSeek Harness (DSH) 桌面端的真实工作区和会话。
 
-**独立、实验性的第三方插件，不是 ZCode 或 DeepSeek 官方产品。** 插件转换协议，不修改 DSH 官方源码、不另起智能体。当前版本 **0.4.0**，已验证 DSH **0.2.0-rc.2**；不保证其他版本或未来升级兼容。**尚未实现 ZCode 全部功能。**
+**独立、实验性的第三方插件，不是 ZCode 或 DeepSeek 官方产品。** 插件转换协议，不修改 DSH 官方源码、不另起智能体。当前版本 **0.4.1**，已验证 DSH **0.2.0-rc.2**；不保证其他版本或未来升级兼容。**尚未实现 ZCode 全部功能。**
+
+## 介绍视频
+
+[在哔哩哔哩观看插件介绍与使用演示](https://www.bilibili.com/video/BV19Spo6yEkA/)。视频可能展示较早版本，当前功能与限制以本 README 为准。
 
 ## 工作方式
 
@@ -23,7 +27,7 @@ iPhone / 手机浏览器
 
 ## 功能和边界
 
-| 功能 | 0.4.0 状态 |
+| 功能 | 0.4.1 状态 |
 | --- | --- |
 | 选择已共享工作区、读取真实会话、新建会话 | 支持 |
 | 文本发送、回复流式显示、停止生成 | 支持 |
@@ -40,12 +44,15 @@ iPhone / 手机浏览器
 | 普通文件上传 | 与图片合计最多 4 个，每个 8 MiB；不代表模型能理解所有文件格式 |
 | 工具输入/输出、实时及持久化思考、上下文和 Token 用量 | 映射 DSH 记录；实时思考有单测，尚未 Chrome 验证；不包含计费报表 |
 | 桌面目录实时同步 | 新会话、标题和归档变更轮询推送，无需手动刷新 |
+| 更多菜单重命名、复制回复/会话 ID、三档主题 | 支持；主题只影响网页，不修改 DSH 设置 |
 | 新建工作区目录、终端、文件浏览器、Git 审查 | 未实现 |
 | 队列拖动排序、暂停自动消费、立即中断并发送 | 未实现；不把下一步插话冒充立即发送 |
 | HEIC/SVG 图片、音视频播放、普通文件历史预览 | 未实现；非图片可作为普通附件传入 DSH |
 | 全局设置、密钥、MCP/Skills/插件管理、机器人、子代理控制 | 未实现，仍使用桌面 |
 
 原版网页可能仍显示不支持的控件，不能据此认定功能已适配。图片理解还取决于模型自身的视觉能力。跨项目请返回手机任务首页。详细优先级、语义差异与验证范围见[验证记录](test/verification.md)。
+
+0.4.1 已修复桌面改名后手机标题栏不同步，严格 `--history` 回归及置顶会话改名验证通过。放弃草稿时，仅归档本次远程创建、尚未使用且未改名/置顶的空会话，**可从归档恢复，不永久删除**；已有会话不会自动清理。异常断网或退出时未送达清理请求，仍可能留下空草稿。“标记为未读”、调用轨迹、点赞/点踩、引用会话/插件/文件等入口未适配，不能视为所有按钮均可用。
 
 审批接管默认关闭，只处理授权工作区的新请求。手机断开、停止配对或 120 秒未答复会交回桌面，不自动批准。限时问答受 DSH 自身期限约束；手机只能延后一次，不能无限占用请求。已交回桌面的请求不能从旧手机卡片重复批准。
 
@@ -70,7 +77,7 @@ cd dsh-ntr-zcode
 npm ci --ignore-scripts
 npm test
 npm pack
-dsh plugin --profile desktop add ./dsh-ntr-zcode-0.4.0.tgz
+dsh plugin --profile desktop add ./dsh-ntr-zcode-0.4.1.tgz
 ```
 
 实际验证环境是 Windows 桌面端；macOS/Linux 安装未验证。此仓库发布不等于已发布到 npm registry。
@@ -114,7 +121,7 @@ npm ci --ignore-scripts
 npm test
 ```
 
-52 项单元测试覆盖协议校验、作用域隔离、去重、停止撤权、刷新恢复、附件、权限、审批交回、队列、历史、目标及压缩投影。GitHub Actions 运行单元测试和打包检查，不访问真实会话或官方中继。
+66 项单元测试覆盖协议校验、作用域隔离、去重、停止撤权、刷新恢复、附件、权限、审批交回、队列、历史、目标及压缩投影。0.4.1 修复逐轮状态、标题同步、重命名菜单接口、主题广播、权限元数据及设置页错误恢复，并加入可恢复的空草稿归档。GitHub Actions 运行单元测试和打包检查，不访问真实会话或官方中继。
 
 集成测试需要另行安装 Playwright 和 Chrome；真实 Host 测试还需要构建好的 DSH 源码。通过 `PLAYWRIGHT_MODULE_PATH` 指定 Playwright 模块，通过 `DSH_SOURCE` 指定 DSH 源码根目录（包含 `apps`、`packages`）。从本仓库根目录运行：
 
@@ -123,6 +130,7 @@ $env:PLAYWRIGHT_MODULE_PATH = 'Playwright模块的绝对路径'
 $env:DSH_SOURCE = '构建好的DSH源码根目录'
 node test/live-web.mjs --live
 node test/real-host.mjs --live --flows
+node test/real-host.mjs --live --flows --audit
 node test/real-host.mjs --live --features
 node test/real-host.mjs --live --extended
 node test/real-host.mjs --live --history

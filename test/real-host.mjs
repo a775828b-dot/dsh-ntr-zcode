@@ -121,6 +121,15 @@ try {
   if (await welcome.first().isVisible()) await welcome.first().click();
   await desktop.getByRole('button', { name: /^(设置|Settings)$/ }).click({ timeout: 10000 });
   await desktop.getByRole('button', { name: 'Dsh ntr Zcode', exact: true }).click({ timeout: 10000 });
+  if (process.argv.includes('--audit')) {
+    const pattern = '**/api/plugins/dsh-ntr-zcode/remote';
+    await desktop.route(pattern, route => route.request().method() === 'GET'
+      ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'NTR simulated offline' }) }) : route.continue());
+    await desktop.getByRole('alert').filter({ hasText: 'NTR simulated offline' }).waitFor({ timeout: 7000 });
+    await desktop.unroute(pattern);
+    await desktop.getByRole('alert').filter({ hasText: 'NTR simulated offline' }).waitFor({ state: 'hidden', timeout: 7000 });
+    console.log('PASS_SETTINGS_ERROR_RECOVERY');
+  }
   // Select by returned workspace identity rather than relying on list order.
   const wsLabel = desktop.locator('.ntr fieldset label').filter({ hasText: workspace });
   for (const checked of await desktop.locator('.ntr fieldset input:checked').all()) await checked.uncheck();
@@ -134,7 +143,9 @@ try {
   const control = await desktop.evaluate(async () => (await fetch('/api/plugins/dsh-ntr-zcode/remote')).json());
   assert(control.link && control.qr);
   mobile = await context.newPage({ viewport: { width: 390, height: 844 } });
-  mobile.on('pageerror', e => console.log('PAGE_ERROR', e.message.replace(/https?:\S+/g, '[url]')));
+  const pageErrors = [];
+  mobile.on('pageerror', e => { pageErrors.push(e.message); console.log('PAGE_ERROR', e.message.replace(/https?:\S+/g, '[url]')); });
+  mobile.on('requestfailed', r => console.log('REQUEST_FAILED', new URL(r.url()).protocol, r.resourceType(), r.failure()?.errorText));
   mobile.on('console', m => { if (['error', 'warning'].includes(m.type())) console.log('BROWSER_DIAGNOSTIC', m.text().replace(/https?:\S+/g, '[url]').slice(0, 1000)); });
   await mobile.setViewportSize({ width: 390, height: 844 });
   await mobile.goto(control.link, { waitUntil: 'domcontentloaded', timeout: 40000 });
@@ -143,12 +154,25 @@ try {
     await mobile.getByRole('button').filter({ has: mobile.locator('svg.lucide-plus') }).first().click();
     await mobile.locator('[contenteditable=true]').first().waitFor({ timeout: 15000 });
     await delay(2500);
+    const draftDirectory = await desktop.evaluate(async () => (await fetch('/api/plugins/ntr-test/directory')).json());
+    const abandonedDraft = draftDirectory.sessions.find(s => s.sessionId !== seed.sessionId && s.blank === true)?.sessionId;
+    assert(abandonedDraft, 'Opening a draft should prewarm a real isolated DSH session');
     await mobile.getByRole('button', { name: '选择项目', exact: true }).click();
     console.log('PROJECTS', await mobile.locator('body').ariaSnapshot());
     await mobile.keyboard.press('Escape');
     // The original inline picker is scoped to the current bridge. Cross-project
     // navigation belongs to the original mobile home, not this local tab menu.
     await mobile.getByRole('button', { name: '返回任务首页', exact: true }).click();
+    let cleanedDraft;
+    for (let i = 0; i < 20; i++) {
+      cleanedDraft = await desktop.evaluate(async () => (await fetch('/api/plugins/ntr-test/directory')).json());
+      if (cleanedDraft.membership.value.archivedSessionIds.includes(abandonedDraft)) break;
+      await delay(300);
+    }
+    assert(cleanedDraft.membership.value.archivedSessionIds.includes(abandonedDraft), 'Abandoned remote draft must be recoverably archived');
+    assert(cleanedDraft.sessions.some(s => s.sessionId === abandonedDraft), 'Cleanup must not delete the session');
+    assert(!cleanedDraft.membership.value.archivedSessionIds.includes(seed.sessionId), 'Do not archive a pre-existing empty session');
+    console.log('PASS_ABANDONED_DRAFT_RECOVERABLE_CLEANUP');
     await mobile.getByRole('button', { name: /^second-project/ }).locator('..').getByRole('button').filter({ has: mobile.locator('svg.lucide-plus') }).click();
     await mobile.getByRole('button', { name: '选择项目', exact: true }).filter({ hasText: 'second-project' }).waitFor({ timeout: 10000 });
     await mobile.getByRole('button', { name: '返回任务首页', exact: true }).click();
@@ -204,6 +228,28 @@ try {
     await mobile.locator('input[type=file]').first().setInputFiles({ name: 'ntr-test.png', mimeType: 'image/png', buffer: png });
     await delay(3500);
     console.log('IMAGE_UPLOAD_UI', await mobile.locator('body').ariaSnapshot());
+    await mobile.getByRole('button', { name: '移除附件', exact: true }).click();
+    await mobile.getByRole('button', { name: '移除附件', exact: true }).waitFor({ state: 'hidden' });
+    assert(await mobile.getByRole('button', { name: '发送', exact: true }).isDisabled());
+    await mobile.locator('input[type=file]').first().setInputFiles({ name: 'ntr-test.png', mimeType: 'image/png', buffer: png });
+    await mobile.getByRole('button', { name: '打开图片预览', exact: true }).click();
+    console.log('IMAGE_LIGHTBOX_UI', await mobile.locator('body').ariaSnapshot());
+    const preview = mobile.getByRole('dialog', { name: 'ntr-test.png', exact: true });
+    await preview.getByRole('button', { name: '放大', exact: true }).click();
+    assert.notEqual(await preview.getByText(/^\d+%$/).innerText(), '100%');
+    await preview.getByRole('button', { name: '缩小', exact: true }).click();
+    assert.equal(await preview.getByText(/^\d+%$/).innerText(), '100%');
+    const downloaded = mobile.waitForEvent('download');
+    await preview.getByRole('button', { name: '下载图片', exact: true }).click();
+    const download = await downloaded;
+    assert.equal(download.suggestedFilename(), 'ntr-test.png');
+    const bytes = [];
+    for await (const chunk of await download.createReadStream()) bytes.push(chunk);
+    assert.deepEqual(Buffer.concat(bytes), png);
+    await preview.getByRole('button', { name: '关闭', exact: true }).click();
+    await preview.waitFor({ state: 'hidden' }); await delay(500);
+    console.log('PASS_IMAGE_ZOOM_DOWNLOAD_CLOSE');
+    console.log('PASS_ATTACHMENT_REMOVE_READD_PREVIEW');
   }
   await mobile.locator('[contenteditable=true]').first().fill('Mobile to real DSH Host test');
   await mobile.getByRole('button', { name: '发送', exact: true }).click({ timeout: 5000 });
@@ -297,6 +343,7 @@ try {
     await mobile.keyboard.press('Escape');
   }
   if (extended) await (await import('./extended-flow.mjs')).extendedFlow({ desktop, mobile, seed });
+  if (flows && process.argv.includes('--audit')) await (await import('./button-audit.mjs')).buttonAudit({ desktop, mobile, seed });
   if (longHistory) await (await import('./history-flow.mjs')).historyFlow({ desktop, mobile });
   await mobile.screenshot({ path: 'test/real-host-mobile.png', fullPage: true });
   await desktop.getByRole('button', { name: '复制链接', exact: true }).click();
@@ -308,6 +355,7 @@ try {
   await desktop.getByRole('button', { name: '停止', exact: true }).click();
   await desktop.getByRole('button', { name: '开启远程', exact: true }).waitFor({ timeout: 5000 });
   await desktop.screenshot({ path: 'test/real-host-settings.png', fullPage: true });
+  assert.deepEqual(pageErrors, [], 'Original page must not raise an uncaught JavaScript exception');
   console.log('PASS: original ZCode page -> official relay -> real DSH session/agent/persistence -> original page. Model output: deterministic replay, no live API call.');
   if (crossModels) console.log(logs.split('\n').filter(l => l.includes('NTR_TEST_COMMAND')).join('\n'));
 } catch (error) {

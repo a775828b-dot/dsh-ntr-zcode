@@ -4,13 +4,17 @@
 
 Experimental protocol adapter for DeepSeek Harness 0.2.0-rc.2. This is an independent plugin, not an official ZCode product. It does not modify DSH or run a second agent.
 
+## Introduction Video
+
+[Watch the introduction on Bilibili (Chinese)](https://www.bilibili.com/video/BV19Spo6yEkA/). The video may show an earlier version; this README describes current capabilities and limitations.
+
 ## Connection
 
 Open DSH Settings > Dsh ntr Zcode, select the workspaces to share, acknowledge remote access, and enable it. Scan the QR code with the iPhone camera and open the link in Safari. The plugin uses the original `https://zcode.z.ai/remote/v4` page and `wss://zcode.z.ai/ws` relay, not a LAN server or a custom mobile page. DSH must remain running and connected to the internet.
 
 The original page's session IDs are mapped to DSH session IDs. Prompts execute in the existing DSH agent with its existing permissions. Model and reasoning choices are read from DSH's real model catalog; no API keys or provider endpoints are sent to the mobile page. As in the original ZCode page, draft choices take effect when sending the next message. DSH's standard model-selection API also updates its default model in the background, just as the desktop selector does.
 
-## Supported In 0.4.0
+## Supported In 0.4.1
 
 - Explicitly selected, registered DSH workspaces and their existing sessions.
 - New sessions in shared workspaces, including the original page's draft/prewarm creation.
@@ -26,9 +30,12 @@ The original page's session IDs are mapped to DSH session IDs. Prompts execute i
 - Real queued submissions, withdraw/edit/delete, and next-step steering. Immediate stop-and-send, queue reordering and auto-drain suspension remain unsupported.
 - DSH plan mode, todo projection, goal creation/pause/resume, and pausing active goals when stopping generation. Goal completion is not a ZCode independent verification result; goal timing/verification history is not mapped.
 - Assistant-message forks, pin/unpin, archive/unarchive and desktop directory updates pushed to the phone.
+- Original task-menu rename, reply/session-ID clipboard actions, and light/dark/system web themes. Theme changes do not modify DSH settings.
 - Tool input/output, live and durable reasoning text, context/token counters, and canonical manual compaction with a completion marker. Live reasoning is unit-tested, not Chrome-verified.
 
 This is NOT full ZCode feature parity. New workspace directories, terminal/file explorer/Git review, provider credentials/global settings, MCP/Skills/plugin administration, bots and subagent controls remain unsupported. Original controls may still be visible. Remote approval requires a separate local opt-in before pairing; requests already owned by the desktop stay there. Stopping a DSH turn retains the queue rather than pausing its automatic consumption. See the verification matrix for implemented, tested and unsupported controls.
+
+Desktop-to-mobile title synchronization is fixed in 0.4.1, including the strict history regression and pinned-task rename. Abandoned drafts created by the current remote pairing are archived only if unused, not renamed and not pinned; they remain recoverable, not permanently deleted. Existing sessions are never automatically cleaned up. A dropped cleanup request during disconnection or shutdown can still leave a blank draft. Mark-unread, model trajectory and ratings/context references are not adapted. This release does not claim every visible button works.
 
 Cross-project navigation uses the original mobile home: return to the task home and choose the shared project there. The inline project picker lists the current bridge's local tabs, not every shared DSH workspace.
 

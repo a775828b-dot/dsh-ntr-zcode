@@ -20,11 +20,94 @@ function fixture() {
 }
 const command = (payload = {}, id = 'command') => ({ commandId: id, clientId: 'phone', sessionId: 'session', issuedAt: Date.now(), type: 'sendText', payload: { text: 'hello', ...payload } });
 
+test('original task-menu rename RPC persists a scoped title and returns real task metadata', async () => {
+  const f = fixture(); const current = structuredClone(summary); let writes = 0;
+  f.backend.session = async (path, id) => { assert.equal(path, '/shared'); assert.equal(id, 'session'); return current; };
+  f.backend.rename = async (path, id, title) => { await f.backend.session(path, id); writes++; current.projections.values.title = title; };
+  try {
+    const meta = await f.bridge.call('zcode-task', 'renameTask', [{ taskId: 'session', workspacePath: '/shared', title: ' New title ' }]);
+    assert.equal(meta.title, 'New title'); assert.equal(meta.taskId, 'session'); assert.equal(meta.titleOverridden, true);
+    for (const title of ['', ' ', 42, 'x'.repeat(1001)]) await assert.rejects(f.bridge.call('zcode-task', 'renameTask', [{ taskId: 'session', title }]));
+    await assert.rejects(f.bridge.call('zcode-task', 'renameTask', [{ taskId: 'private', title: 'Secret' }]));
+    await assert.rejects(f.bridge.call('zcode-task', 'renameTask', [{ workspacePath: '/private', taskId: 'session', title: 'Secret' }]));
+    assert.equal(writes, 1);
+  } finally { f.bridge.dispose(); }
+});
+
+test('theme broadcasts stay within the web bridge and cannot write desktop settings', async () => {
+  const f = fixture(); const received = [];
+  f.bridge.events.set('broadcast.onMessage', { fire: x => received.push(x), dispose() {} });
+  try {
+    for (const payload of ['dark', 'light', 'zai-dark', 'zai-light', 'system']) await f.bridge.call('broadcast', 'send', [{ channel: 'state:theme', payload }]);
+    assert.deepEqual(received.map(m => m.payload), ['dark', 'light', 'zai-dark', 'zai-light', 'system']);
+    await assert.rejects(f.bridge.call('broadcast', 'send', [{ channel: 'state:theme', payload: 'unknown' }]));
+    await assert.rejects(f.bridge.call('broadcast', 'send', [{ channel: 'settings:update', payload: { permissions: 'yolo' } }]));
+    assert.equal(f.prompts(), 0);
+  } finally { f.bridge.dispose(); }
+});
+
+test('session reads and task metadata expose the same actual DSH permission mode', async () => {
+  const f = fixture(); const current = structuredClone(summary);
+  f.backend.session = async (path, id) => { assert.equal(path, '/shared'); assert.equal(id, 'session'); return current; };
+  try {
+    for (const [preset, mode] of [['read-only', 'build'], ['workspace-write', 'edit'], ['danger-full-access', 'yolo']]) {
+      current.projections.values.permissions = { currentValue: preset };
+      const snapshot = await f.bridge.call('zcode-session', 'readSession', [{ sessionId: 'session' }]);
+      const meta = await f.bridge.call('zcode-task', 'getTaskMeta', [{ taskId: 'session' }]);
+      assert.equal(snapshot.session.mode, mode);
+      assert.equal(snapshot.settings.mode.current, mode);
+      assert.equal(snapshot.projection.mode, mode);
+      assert.equal(meta.mode, mode);
+    }
+  } finally { f.bridge.dispose(); }
+});
+
+test('shell metadata notification preserves title authority and does not resend unchanged facts', () => {
+  const f = fixture(); const received = [];
+  const conversation = new Conversation(structuredClone(summary), 'epoch');
+  const sub = { conversation };
+  try {
+    f.bridge.notifyTaskMeta(sub);
+    f.bridge.events.set('broadcast.onMessage', { fire: x => received.push(x), dispose() {} });
+    f.bridge.notifyTaskMeta(sub);
+    f.bridge.notifyTaskMeta(sub);
+    assert.equal(received.length, 1);
+    conversation.event({ type: 'session/title', seq: 2, time: 2000, data: { title: 'New title' } });
+    f.bridge.notifyTaskMeta(sub);
+    assert.equal(received[1].payload.task.title, 'New title');
+    assert.equal(received[1].payload.task.updatedAt, 2000);
+    assert.equal(received[1].payload.task.titleOverridden, true);
+    assert.equal(received[1].payload.workspacePath, '/shared');
+    assert.equal(received[1].payload.event, 'updated');
+    assert.equal(received[1].payload.prompt, undefined);
+    f.bridge.dispose();
+    conversation.event({ type: 'session/title', seq: 3, time: 3000, data: { title: 'After stop' } });
+    f.bridge.notifyTaskMeta(sub);
+    assert.equal(received.length, 2);
+  } finally { f.bridge.dispose(); }
+});
+
+test('deleteSession delegates only to guarded draft cleanup and rejects extra options', async () => {
+  const f = fixture(); let calls = 0;
+  f.backend.discardDraft = async (path, id) => { assert.equal(path, '/shared'); assert.equal(id, 'session'); calls++; return true; };
+  try {
+    const raw = { ...command({}, 'cleanup'), type: 'deleteSession', payload: {} };
+    assert.equal((await f.bridge.command(raw)).status, 'accepted');
+    assert.equal((await f.bridge.command(raw)).status, 'accepted');
+    assert.equal(calls, 1);
+    assert.equal((await f.bridge.command({ ...raw, commandId: 'bad', payload: { force: true } })).status, 'rejected');
+    assert.equal(calls, 1);
+    f.backend.discardDraft = async () => false;
+    assert.equal((await f.bridge.command({ ...raw, commandId: 'used' })).status, 'rejected');
+  } finally { f.bridge.dispose(); }
+});
+
 test('directory is mapped from the existing DSH session ID/title', async () => {
   const f = fixture();
   try { const d = await directory(f.backend); assert.equal(d.tasks[0].taskId, 'session'); assert.equal(d.tasks[0].title, 'Existing DSH session'); }
   finally { f.bridge.dispose(); }
 });
+
 test('duplicate and concurrent commands submit once', async () => {
   const f = fixture();
   try {

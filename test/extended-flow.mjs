@@ -125,6 +125,12 @@ export async function extendedFlow({ desktop, mobile, seed }) {
   await row.getByRole('button', { name: '置顶任务', exact: true }).click();
   await delay(2000);
   assert((await directory()).membership.value.pinnedSessionIds.includes(seed.sessionId));
+  await desktop.evaluate(async sessionId => fetch('/api/plugins/ntr-test/rename', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId, title: 'NTR Pinned Rename' }) }), seed.sessionId);
+  await mobile.getByRole('heading', { name: 'NTR Pinned Rename', exact: true }).waitFor({ timeout: 12000 });
+  assert((await directory()).membership.value.pinnedSessionIds.includes(seed.sessionId));
+  await desktop.evaluate(async sessionId => fetch('/api/plugins/ntr-test/rename', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId, title: 'NTR Original Live Rename' }) }), seed.sessionId);
+  await mobile.getByRole('heading', { name: 'NTR Original Live Rename', exact: true }).waitFor({ timeout: 12000 });
+  console.log('PASS_PINNED_TITLE_SYNC');
   await row.hover();
   await row.getByRole('button', { name: /取消置顶/ }).click();
   await delay(1500);
