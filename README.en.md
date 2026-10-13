@@ -2,7 +2,7 @@
 
 [中文](README.md)
 
-Experimental protocol adapter verified with DeepSeek Harness 0.2.0-rc.2 and the 0.2.1-alpha.2 source Host. All four Chrome regression groups passed on the latter; see the [compatibility record](test/compatibility-0.2.1-alpha.2.md). This is an independent plugin, not an official ZCode product. It does not modify DSH or run a second agent.
+Experimental protocol adapter. Version 0.5.0 queue controls are verified against the DSH 0.2.1-alpha.2 source Host; see the [queue verification record](test/queue-0.5.0.md). Earlier 0.4.1 compatibility results are recorded [separately](test/compatibility-0.2.1-alpha.2.md). This is an independent plugin, not an official ZCode product. It does not modify DSH or run a second agent.
 
 ## Introduction Video
 
@@ -14,7 +14,7 @@ Open DSH Settings > Dsh ntr Zcode, select the workspaces to share, acknowledge r
 
 The original page's session IDs are mapped to DSH session IDs. Prompts execute in the existing DSH agent with its existing permissions. Model and reasoning choices are read from DSH's real model catalog; no API keys or provider endpoints are sent to the mobile page. As in the original ZCode page, draft choices take effect when sending the next message. DSH's standard model-selection API also updates its default model in the background, just as the desktop selector does.
 
-## Supported In 0.4.1
+## Supported In 0.5.0
 
 - Explicitly selected, registered DSH workspaces and their existing sessions.
 - New sessions in shared workspaces, including the original page's draft/prewarm creation.
@@ -27,13 +27,15 @@ The original page's session IDs are mapped to DSH session IDs. Prompts execute i
 - Request deduplication for the lifetime of the current pairing; unsupported remote mutations fail explicitly.
 - Restoring the active shared session after reloading the mobile page.
 - Opt-in remote approval (allow once/reject) and structured questions. Disconnect or a 120-second timeout returns ownership to the desktop, never automatic approval. Timed questions retain DSH deadlines and support one bounded snooze.
-- Real queued submissions, withdraw/edit/delete, and next-step steering. Immediate stop-and-send, queue reordering and auto-drain suspension remain unsupported.
+- Real queued submissions, withdraw/edit/delete, next-step steering, drag reordering, auto-drain pause/resume, and immediate stop-and-send. Immediate send waits for actual idle, promotes the selected occurrence and then drains the remaining queue in order; message IDs and attachments are retained.
 - DSH plan mode, todo projection, goal creation/pause/resume, and pausing active goals when stopping generation. Goal completion is not a ZCode independent verification result; goal timing/verification history is not mapped.
 - Assistant-message forks, pin/unpin, archive/unarchive and desktop directory updates pushed to the phone.
 - Original task-menu rename, reply/session-ID clipboard actions, and light/dark/system web themes. Theme changes do not modify DSH settings.
 - Tool input/output, live and durable reasoning text, context/token counters, and canonical manual compaction with a completion marker. Live reasoning is unit-tested, not Chrome-verified.
 
-This is NOT full ZCode feature parity. New workspace directories, terminal/file explorer/Git review, provider credentials/global settings, MCP/Skills/plugin administration, bots and subagent controls remain unsupported. Original controls may still be visible. Remote approval requires a separate local opt-in before pairing; requests already owned by the desktop stay there. Stopping a DSH turn retains the queue rather than pausing its automatic consumption. See the verification matrix for implemented, tested and unsupported controls.
+This is NOT full ZCode feature parity. New workspace directories, terminal/file explorer/Git review, provider credentials/global settings, MCP/Skills/plugin administration, bots and subagent controls remain unsupported. Original controls may still be visible. Remote approval requires a separate local opt-in before pairing; requests already owned by the desktop stay there. See the verification matrix for implemented, tested and unsupported controls.
+
+Queue policy: Stop preserves and pauses queued work; the queue Continue button resumes FIFO consumption. The protocol also supports `setAutoDrain(false)` without interrupting the current reply, but the original page has no separate pause-only button. Pause survives browser reload and re-pairing, but is process-local and resets on a full DSH restart/plugin reload. Queue contents themselves remain durable in DSH. The gate also applies to new desktop submissions in that paused session. Unloading the plugin cancels still-paused active tasks while retaining their Inbox. Failed promotion, revoked sharing or stop timeouts do not silently send another item.
 
 Desktop-to-mobile title synchronization is fixed in 0.4.1, including the strict history regression and pinned-task rename. Abandoned drafts created by the current remote pairing are archived only if unused, not renamed and not pinned; they remain recoverable, not permanently deleted. Existing sessions are never automatically cleaned up. A dropped cleanup request during disconnection or shutdown can still leave a blank draft. Mark-unread, model trajectory and ratings/context references are not adapted. This release does not claim every visible button works.
 

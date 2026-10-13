@@ -1,4 +1,7 @@
-# Verification: Dsh ntr Zcode 0.4.1
+# Verification: Dsh ntr Zcode
+
+Latest: [0.5.0 queue controls and regressions](queue-0.5.0.md), DSH 0.2.1-alpha.2.
+The historical 0.4.1 results below describe that release, not the latest queue implementation.
 
 DSH: 0.2.0-rc.2. ZCode protocol reference:
 `aac4755666d09fdcd70272fcf063c077a639015f`.
@@ -7,7 +10,7 @@ Additional compatibility run on 2026-10-13: DSH 0.2.1-alpha.2 source Host,
 all four Chrome groups passed without plugin runtime changes. See the
 [version-specific record](compatibility-0.2.1-alpha.2.md) for evidence and limits.
 
-## Current Audit Status
+## Historical 0.4.1 Audit
 
 The strict `--history` regression now passes: a desktop rename reaches both the
 home list and conversation header, including reopen, paging and compaction.
@@ -15,7 +18,7 @@ The extended suite also verifies a rename while pinned, without changing Host me
 See [the 0.4.1 button audit](audit-0.4.1.md) for unsupported and unverified controls.
 This audit does not certify full button parity or readiness for a stable release.
 
-Latest checks: `npm test` covers 66 cases. `--flows --audit`, `--history` and
+0.4.1 checks: `npm test` covered 66 cases. `--flows --audit`, `--history` and
 `--extended` passed against Google Chrome and the original hosted web page, with
 no uncaught page exceptions. Draft cleanup archives only owned, unused sessions
 and leaves an existing blank fixture untouched. Theme validation includes the
@@ -111,7 +114,7 @@ These are automated UI tests, not a claim that every possible human action was t
 | P0 | Pairing revoke/reload | Relay lifecycle, scope guards | Chrome copy/refresh/stop/reload; stale proof, duplicate commands and scope isolation unit-tested |
 | P1 | Queue, edit, remove | DSH Inbox and receipts | Chrome admission, withdrawal, resend and removal |
 | P1 | Guide follow-up | DSH next-step steering | Implemented and unit-tested; not interruption |
-| P1 | Queue immediate send/reorder/auto-drain | No equivalent controller operation | Not implemented; immediate-send capability disabled |
+| P1 | Queue immediate send/reorder/auto-drain | Public Agent Inbox splice/send/cancel/whenIdle and turn admission gate | Added in 0.5.0; see queue verification record and lifecycle limits |
 | P1 | Ordinary attachments | DSH file upload receipts | Chrome TXT durable upload; no general-file browser preview |
 | P1 | Older messages | Controller page at snapshot cut | Chrome scroll through 230 synthetic persisted messages |
 | P1 | Compact | Canonical /compact | Chrome actual compact checkpoint and completion marker |

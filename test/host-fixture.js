@@ -14,12 +14,14 @@ export async function apply(ctx) {
     };
   }
   const command = Bridge.prototype.command;
+  let lastBridge;
   const call = Bridge.prototype.call;
   Bridge.prototype.call = async function (...args) {
     try { return await call.apply(this, args); }
     catch (error) { console.log('NTR_TEST_RPC_ERROR', args[0], args[1], error.message); throw error; }
   };
   Bridge.prototype.command = async function (raw) {
+    lastBridge = this;
     let result;
     try { result = await command.call(this, raw); }
     catch (error) { console.log('NTR_TEST_PARSE_ERROR', raw.type, raw.payload, error.message); throw error; }
@@ -29,6 +31,14 @@ export async function apply(ctx) {
     return result;
   };
   let sessionId;
+  ctx.effect(() => ctx.connection.fetch.register({ path: '/api/plugins/ntr-test/queue-policy', methods: ['POST'], requestBody: 'buffered', fetch: async request => {
+    const input = await request.json();
+    if (typeof input.autoDrain !== 'boolean' || !lastBridge || lastBridge.closed) return new Response('Invalid test operation', { status: 400 });
+    const conversation = [...lastBridge.subs.values()].find(s => s.conversation?.summary.sessionId === input.sessionId)?.conversation;
+    if (!conversation) return new Response('No subscribed fixture session', { status: 400 });
+    return Response.json(await lastBridge.command({ type: 'setAutoDrain', commandId: crypto.randomUUID(), clientId: 'test', sessionId: input.sessionId,
+      issuedAt: Date.now(), baseRevision: conversation.seq, baseLogEpoch: lastBridge.epoch, payload: { autoDrain: input.autoDrain } }));
+  } }), 'Isolated queue policy protocol test');
   ctx.effect(() => ctx.connection.fetch.register({ path: '/api/plugins/ntr-test/long-history', methods: ['POST'], requestBody: 'buffered', fetch: async () => {
     const { createUserMessage } = await import(pathToFileURL(join(process.env.DSH_NTR_SOURCE, 'packages/llm/llm/lib/index.js')).href);
     const created = { sessionId };

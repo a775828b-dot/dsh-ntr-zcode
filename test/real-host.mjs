@@ -10,6 +10,7 @@ const flows = process.argv.includes('--flows');
 const extended = process.argv.includes('--extended');
 const features = process.argv.includes('--features');
 const longHistory = process.argv.includes('--history');
+const queueFlow = process.argv.includes('--queue');
 const crossModels = features || process.argv.includes('--models');
 const source = resolve(process.env.DSH_SOURCE || '../../source');
 const sourceVersion = JSON.parse(await readFile(join(source, 'apps/cli/package.json'), 'utf8')).version;
@@ -49,6 +50,9 @@ await writeFile(join(home, 'replay.json'), JSON.stringify([
       : [{ kind: 'hang' }, textStream('DSH real Host continued after stop.')]),
   ...(extended ? [...(features ? [{ kind: 'hang' }, textStream('Extended file received.')] : []), toolStream,
     textStream('NTR plan and tool completed.'), { kind: 'hang' }, { kind: 'hang' }] : []),
+  ...(queueFlow ? [{ kind: 'hang' }, textStream('Queue promoted B.'), textStream('Queue drained C.'), textStream('Queue drained A.'),
+    textStream(`Queue slow current ${'waiting '.repeat(80)}complete.`), textStream('Queue resumed D.'), textStream('Queue resumed E.'),
+    { kind: 'hang' }, textStream('Queue immediate F.'), textStream('Queue after F G.')] : []),
 ]));
 await writeFile(join(home, 'overlay.yml'), `
 - id: llm-deepseek
@@ -355,6 +359,7 @@ try {
     await mobile.keyboard.press('Escape');
   }
   if (extended) await (await import('./extended-flow.mjs')).extendedFlow({ desktop, mobile, seed });
+  if (queueFlow) await (await import('./queue-flow.mjs')).queueFlow({ desktop, mobile, seed, imageBytes });
   if (flows && process.argv.includes('--audit')) await (await import('./button-audit.mjs')).buttonAudit({ desktop, mobile, seed });
   if (longHistory) await (await import('./history-flow.mjs')).historyFlow({ desktop, mobile });
   await mobile.screenshot({ path: 'test/real-host-mobile.png', fullPage: true });
