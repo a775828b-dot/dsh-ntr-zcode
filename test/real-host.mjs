@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 if (!process.argv.includes('--live')) throw new Error('Pass --live to test the official page and relay with an isolated DSH Host');
 const flows = process.argv.includes('--flows');
@@ -11,6 +12,17 @@ const features = process.argv.includes('--features');
 const longHistory = process.argv.includes('--history');
 const crossModels = features || process.argv.includes('--models');
 const source = resolve(process.env.DSH_SOURCE || '../../source');
+const sourceVersion = JSON.parse(await readFile(join(source, 'apps/cli/package.json'), 'utf8')).version;
+const builtVersion = execFileSync(process.execPath, [join(source, 'apps/cli/lib/bin.js'), '--version'],
+  { cwd: source, encoding: 'utf8', windowsHide: true, timeout: 15000 }).trim();
+assert.equal(builtVersion, sourceVersion, 'DSH CLI and source manifest versions must agree');
+const { readClientBuildRecord } = await import(pathToFileURL(join(source, 'scripts/client-build-environment.ts')).href);
+const buildRecord = readClientBuildRecord(source);
+assert.equal(buildRecord.environment.DSH_CLIENT_VERSION, sourceVersion, 'Rebuild the DSH client after switching versions');
+const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: source, encoding: 'utf8', windowsHide: true }).trim();
+assert.equal(buildRecord.environment.DSH_CLIENT_COMMIT_HASH, sourceCommit.slice(0, 7), 'Rebuild the DSH client after switching commits');
+if (process.env.DSH_EXPECT_VERSION) assert.equal(builtVersion, process.env.DSH_EXPECT_VERSION, 'Unexpected DSH test version');
+console.log('DSH_TEST_VERSION', builtVersion, sourceCommit);
 const home = await mkdtemp(resolve('test/isolated-'));
 const workspace = join(home, 'workspace');
 await mkdir(workspace);

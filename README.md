@@ -4,7 +4,7 @@
 
 通过 ZCode 原版移动网页，在手机浏览器访问 DeepSeek Harness (DSH) 桌面端的真实工作区和会话。
 
-**独立、实验性的第三方插件，不是 ZCode 或 DeepSeek 官方产品。** 插件转换协议，不修改 DSH 官方源码、不另起智能体。当前版本 **0.4.1**，已验证 DSH **0.2.0-rc.2**；不保证其他版本或未来升级兼容。**尚未实现 ZCode 全部功能。**
+**独立、实验性的第三方插件，不是 ZCode 或 DeepSeek 官方产品。** 插件转换协议，不修改 DSH 官方源码、不另起智能体。当前版本 **0.4.1**，已验证 DSH **0.2.0-rc.2**，并通过 **0.2.1-alpha.2** 源码 Host 的四组 Chrome 回归（[兼容记录](test/compatibility-0.2.1-alpha.2.md)）；不保证其他版本或未来升级兼容。**尚未实现 ZCode 全部功能。**
 
 ## 介绍视频
 
@@ -128,6 +128,7 @@ npm test
 ```powershell
 $env:PLAYWRIGHT_MODULE_PATH = 'Playwright模块的绝对路径'
 $env:DSH_SOURCE = '构建好的DSH源码根目录'
+$env:DSH_EXPECT_VERSION = '0.2.1-alpha.2' # 可选：限定本次测试目标版本
 node test/live-web.mjs --live
 node test/real-host.mjs --live --flows
 node test/real-host.mjs --live --flows --audit

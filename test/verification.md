@@ -3,6 +3,10 @@
 DSH: 0.2.0-rc.2. ZCode protocol reference:
 `aac4755666d09fdcd70272fcf063c077a639015f`.
 
+Additional compatibility run on 2026-10-13: DSH 0.2.1-alpha.2 source Host,
+all four Chrome groups passed without plugin runtime changes. See the
+[version-specific record](compatibility-0.2.1-alpha.2.md) for evidence and limits.
+
 ## Current Audit Status
 
 The strict `--history` regression now passes: a desktop rename reaches both the

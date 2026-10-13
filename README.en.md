@@ -2,7 +2,7 @@
 
 [中文](README.md)
 
-Experimental protocol adapter for DeepSeek Harness 0.2.0-rc.2. This is an independent plugin, not an official ZCode product. It does not modify DSH or run a second agent.
+Experimental protocol adapter verified with DeepSeek Harness 0.2.0-rc.2 and the 0.2.1-alpha.2 source Host. All four Chrome regression groups passed on the latter; see the [compatibility record](test/compatibility-0.2.1-alpha.2.md). This is an independent plugin, not an official ZCode product. It does not modify DSH or run a second agent.
 
 ## Introduction Video
 
@@ -80,7 +80,7 @@ No test reads the user's existing DSH profile. These tests do not establish actu
 
 Clone this repository and run `./scripts/install.ps1` in PowerShell after closing DSH. Node.js 22+ is required. It installs dependencies, tests and packs this plugin and uses the desktop-bundled DSH plugin installer. Use `-PackOnly` to build without installation or `-DshCli` for a non-default CLI location. Installation does not enable remote access. Reopen DSH after installation. Upgrades can require adapter changes because DSH plugin APIs are pre-stable; installing as a plugin avoids edits to official source but does not guarantee perpetual API compatibility.
 
-For integration tests, set `DSH_SOURCE` to the built DSH checkout and `PLAYWRIGHT_MODULE_PATH` to an installed Playwright module (defaults to `playwright`). For vendor rebuilds, set `ZCODE_SOURCE` to a ZCode checkout at `aac4755666d09fdcd70272fcf063c077a639015f`. These checkouts, generated test profiles and screenshots are not included. See the Chinese README for complete commands. This repository has not been published to the npm registry.
+For integration tests, set `DSH_SOURCE` to the built DSH checkout and `PLAYWRIGHT_MODULE_PATH` to an installed Playwright module (defaults to `playwright`). Optionally set `DSH_EXPECT_VERSION` to the exact target, for example `0.2.1-alpha.2`; the harness checks CLI/source versions and the artifact-verified client build record before starting a test Host. For vendor rebuilds, set `ZCODE_SOURCE` to a ZCode checkout at `aac4755666d09fdcd70272fcf063c077a639015f`. These checkouts, generated test profiles and screenshots are not included. See the Chinese README for complete commands. This repository has not been published to the npm registry.
 
 ## License
 
