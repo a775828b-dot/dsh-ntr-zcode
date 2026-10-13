@@ -54,3 +54,26 @@ test('stop cancels an in-flight start and does not leave timers/sockets alive', 
   await assert.rejects(start, /stopped/);
   assert.equal(Socket.instances.at(-1).readyState, 3); assert.equal(relay.link(), null);
 });
+
+test('phone reload relay error suspends data without discarding pairing; auth failure revokes it', async () => {
+  const relay = new Relay({ WebSocketCtor: Socket, onPayload: () => {} });
+  try {
+    const socket = await connected(relay);
+    const link = relay.link();
+    const before = socket.sent.length;
+    assert.equal(relay.payload({ private: true }), false);
+    assert.equal(socket.sent.length, before);
+    socket.receive({ type: 'pair_status_ack', pair_status: 'matched' });
+    assert.equal(relay.payload({ fixture: true }), true);
+    socket.receive({ type: 'error', code: 'INTERNAL' });
+    assert.equal(relay.state, 'waiting');
+    assert.equal(new URL(relay.link()).searchParams.get('sid'), new URL(link).searchParams.get('sid'));
+    assert.equal(relay.payload({ private: true }), false);
+    assert.equal(socket.sent.at(-1).type, 'pair_status_query');
+    socket.receive({ type: 'pair_status_ack', pair_status: 'matched' });
+    assert.equal(relay.payload({ fixture: true }), true);
+    socket.receive({ type: 'error', code: 'AUTH_FAILED' });
+    assert.equal(relay.link(), null);
+    assert.equal(socket.readyState, 3);
+  } finally { relay.stop(); }
+});

@@ -1,11 +1,11 @@
-# Verification: Dsh ntr Zcode 0.3.0
+# Verification: Dsh ntr Zcode 0.4.0
 
 DSH: 0.2.0-rc.2. ZCode protocol reference:
 `aac4755666d09fdcd70272fcf063c077a639015f`.
 
 ## Passed
 
-- `npm test`: 32/32 tests, including scope isolation, concurrent command deduplication,
+- `npm test`: 52/52 tests, including scope isolation, concurrent command deduplication,
   unsupported input rejection, removed-session access revocation, delayed response
   cancellation, asynchronous snapshot failure handling and credential rotation.
 - `node test/real-host.mjs --live`: original `zcode.z.ai/remote/v4` page and official
@@ -65,12 +65,61 @@ mapping, and storing the validated mobile view state for reloads.
 - Chrome viewport testing is not an actual iPhone/Safari test.
 - Model output came from DSH's official deterministic replay provider, not a paid API.
 - Tests use synthetic messages in isolated profiles, not the user's existing data.
-- Session lists are read on directory load; index subscriptions currently send an
-  initial snapshot. Reopen/refresh the mobile directory to discover desktop changes.
-- New session creation and existing-model/reasoning choices are now implemented.
-  New project directories, non-image attachments, file/terminal UI, credential
-  management and remote approvals remain unsupported. See README.md.
+- Directory subscriptions now poll and push changes. Chrome verified a desktop rename appearing without a mobile refresh.
+- This remains a partial adapter, not full ZCode parity. New project directories,
+  file explorer/terminal/Git review, credentials/global settings, bots, plugin/MCP/Skills
+  administration and subagent controls are not implemented. See the matrix below.
 - Successful public-relay compatibility is not an uptime guarantee or permission
   agreement with its operator. WSS is transport encryption, not end-to-end encryption.
 - Test processes and pairing connections are closed at completion. Temporary local
   authentication files are cleared. Credentials are not part of the package.
+
+## 0.4.0 Extended Chrome Verification
+
+Google Chrome (`channel: chrome`), original unmodified page, official relay, isolated
+real DSH Host. Mobile 390x844 and wide 1440x960. Buttons, menus, typing, file picking,
+scrolling and hover were exercised; Host projections/inbox/membership were asserted.
+These are automated UI tests, not a claim that every possible human action was tested.
+
+| Priority | ZCode control | DSH mapping | Evidence / remaining boundary |
+| --- | --- | --- | --- |
+| P0 | Projects, sessions, new task | Shared workspace + session controller | Chrome flows; no new filesystem directory creation |
+| P0 | Send, stream, stop, continue | Existing agent prompt/cancel | Chrome; stop retains pending queue |
+| P0 | Model and reasoning | Real model catalog/selection | Chrome GLM to DeepSeek Account; no live paid API |
+| P0 | Three permission modes | Canonical permission command | Chrome all three; confirm mode is stricter read-only |
+| P0 | Allow/reject approval | DSH approval waterfall | Chrome allow once + reject; explicit desktop opt-in |
+| P0 | Structured questions | DSH userQuestions | Chrome option + custom answer; timed claim/snooze unit-tested only |
+| P0 | Image upload/history | DSH durable images | Chrome PNG with text, image-only, reload/preview; other raster validation unit-tested |
+| P0 | Pairing revoke/reload | Relay lifecycle, scope guards | Chrome copy/refresh/stop/reload; stale proof, duplicate commands and scope isolation unit-tested |
+| P1 | Queue, edit, remove | DSH Inbox and receipts | Chrome admission, withdrawal, resend and removal |
+| P1 | Guide follow-up | DSH next-step steering | Implemented and unit-tested; not interruption |
+| P1 | Queue immediate send/reorder/auto-drain | No equivalent controller operation | Not implemented; immediate-send capability disabled |
+| P1 | Ordinary attachments | DSH file upload receipts | Chrome TXT durable upload; no general-file browser preview |
+| P1 | Older messages | Controller page at snapshot cut | Chrome scroll through 230 synthetic persisted messages |
+| P1 | Compact | Canonical /compact | Chrome actual compact checkpoint and completion marker |
+| P1 | Plan / todo status | /plan and todos projection | Chrome actual todo_write call and plan projection |
+| P1 | Goal create/pause/resume/stop | Canonical /goal commands | Chrome actual phase transitions; not ZCode independent verifier |
+| P1 | Tool output / reasoning / tokens | DSH events/projections/stream | Unit coverage including live reasoning and JSON arguments; actual todo/tool and token UI; live reasoning not Chrome-verified |
+| P1 | Fork assistant | Controller fork at event seq | Chrome new real session; original branch preserved |
+| P1 | Desktop title/index updates | Scoped directory polling | Chrome renamed title appears without reload |
+| P1 | Pin/unpin/archive/unarchive | Workspace controller membership | Chrome wide hover + confirmation; persistent membership checked |
+| P2 | File tree and Git review | Requires new scoped services | Not implemented |
+| P2 | Terminal | Requires terminal lifecycle and separate authorization | Not implemented |
+| P2 | Retry/edit old prompt/rewind | Needs precise branch and tool-side-effect semantics | Not implemented |
+| P2 | New project directory | Needs desktop-approved filesystem scope | Not implemented |
+| P2 | Subagent panels/control | DSH ownership model differs | Not implemented |
+| P3 | Settings, providers, secrets | Separate administrative surface | Not implemented; secrets never forwarded |
+| P3 | Skills/MCP/plugin/bot management | Host-specific administration | Not implemented |
+| P3 | Theme, copy, navigation | Original webpage local behavior | No DSH adapter needed; not all themes/shortcuts tested |
+
+Regression fixes found through UI testing: implicit queue routing; duplicate approval
+ACKs; independent-plan capability negotiation and bare `/plan` syntax; nested DSH
+goal projection; stopping an active goal; optional epochs on non-row CAS commands;
+old-history title isolation; relay INTERNAL recovery during phone reload and suppressing
+business frames while unpaired. Authentication errors still revoke the pairing.
+No successful result is fabricated for unsupported writes.
+
+Timing/network coverage is bounded: timeout/abort/disconnect fallback and stale requests
+have unit tests; arbitrary mobile network failures, multiple concurrent phones, Safari
+background suspension, HEIC conversion, and very large histories remain unverified.
+Upstream React Tooltip controlled/uncontrolled warnings remain visible in Chrome logs.

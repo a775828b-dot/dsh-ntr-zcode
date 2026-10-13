@@ -6,7 +6,9 @@ import { resolve, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 if (!process.argv.includes('--live')) throw new Error('Pass --live to test the official page and relay with an isolated DSH Host');
 const flows = process.argv.includes('--flows');
+const extended = process.argv.includes('--extended');
 const features = process.argv.includes('--features');
+const longHistory = process.argv.includes('--history');
 const crossModels = features || process.argv.includes('--models');
 const source = resolve(process.env.DSH_SOURCE || '../../source');
 const home = await mkdtemp(resolve('test/isolated-'));
@@ -21,7 +23,21 @@ const textStream = text => ({ kind: 'chunks', chunks: [
   { type: 'usage', usage: { inputTokens: 10, outputTokens: 10 } },
   { type: 'finish', reason: { kind: 'stop' } },
 ] });
-await writeFile(join(home, 'replay.json'), JSON.stringify([textStream('DSH real Host initial reply.'), textStream('DSH real Host received the mobile message.'), ...(features ? [textStream('DSH permission step 1.'), textStream('DSH permission step 2.'), textStream('DSH image-only reply.')] : [{ kind: 'hang' }, textStream('DSH real Host continued after stop.')]) ]));
+const todoArgs = JSON.stringify({ todos: [{ content: 'NTR inspect bridge', status: 'completed' }, { content: 'NTR verify mobile', status: 'in_progress' }] });
+const toolStream = { kind: 'chunks', chunks: [
+  { type: 'block-start', index: 0, blockType: 'tool-call' },
+  { type: 'tool-call-delta', index: 0, id: 'ntr-todo', name: 'todo_write', argumentsDelta: todoArgs },
+  { type: 'block-end', index: 0, block: { type: 'tool-call', id: 'ntr-todo', name: 'todo_write', arguments: todoArgs } },
+  { type: 'finish', reason: { kind: 'tool-calls' } },
+] };
+await writeFile(join(home, 'replay.json'), JSON.stringify([
+  textStream('DSH real Host initial reply.'), textStream('DSH real Host received the mobile message.'),
+  ...(longHistory ? [textStream('NTR compacted history: synthetic numbered messages were reviewed; no external actions were performed.')]
+    : features ? [textStream('DSH permission step 1.'), textStream('DSH permission step 2.'), textStream('DSH image-only reply.')]
+      : [{ kind: 'hang' }, textStream('DSH real Host continued after stop.')]),
+  ...(extended ? [...(features ? [{ kind: 'hang' }, textStream('Extended file received.')] : []), toolStream,
+    textStream('NTR plan and tool completed.'), { kind: 'hang' }, { kind: 'hang' }] : []),
+]));
 await writeFile(join(home, 'overlay.yml'), `
 - id: llm-deepseek
   disabled: true
@@ -74,7 +90,7 @@ await writeFile(join(home, 'overlay.yml'), `
   - id: ntr-test-fixture
     name: '${slash(resolve('test/host-fixture.js'))}'
 `);
-const env = { ...process.env, DSH_HOME: home, DSH_NTR_ISOLATED_TEST: '1', DSH_NTR_TEST_WORKSPACE: workspace, DSH_TELEMETRY: '0' };
+const env = { ...process.env, DSH_HOME: home, DSH_NTR_ISOLATED_TEST: '1', DSH_NTR_TEST_WORKSPACE: workspace, DSH_NTR_SOURCE: source, DSH_TELEMETRY: '0' };
 delete env.DEEPSEEK_API_KEY;
 const child = spawn(process.execPath, [join(source, 'apps/cli/lib/bin.js'), '--profile', 'web', '--patch', join(source, 'apps/web/tests/pin-browse-picker.overlay.yml'), '--patch', join(home, 'overlay.yml'), '--no-open', '--port', '0'], { cwd: workspace, env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
 let logs = '';
@@ -112,12 +128,14 @@ try {
   if (flows) await desktop.locator('.ntr fieldset label').filter({ hasText: 'second-project' }).locator('input').check();
   await desktop.getByLabel('允许手机通过官方中继访问所选工作区').check();
   await desktop.getByLabel('允许手机切换 DSH 权限（含完全权限）').check();
+  if (extended) await desktop.getByLabel('允许手机接管新审批和问答（断开或超时后交回桌面）').check();
   await desktop.getByRole('button', { name: '开启远程', exact: true }).click();
   await desktop.locator('.ntr-qr').waitFor({ timeout: 25000 });
   const control = await desktop.evaluate(async () => (await fetch('/api/plugins/dsh-ntr-zcode/remote')).json());
   assert(control.link && control.qr);
   mobile = await context.newPage({ viewport: { width: 390, height: 844 } });
   mobile.on('pageerror', e => console.log('PAGE_ERROR', e.message.replace(/https?:\S+/g, '[url]')));
+  mobile.on('console', m => { if (['error', 'warning'].includes(m.type())) console.log('BROWSER_DIAGNOSTIC', m.text().replace(/https?:\S+/g, '[url]').slice(0, 1000)); });
   await mobile.setViewportSize({ width: 390, height: 844 });
   await mobile.goto(control.link, { waitUntil: 'domcontentloaded', timeout: 40000 });
   if (flows) {
@@ -278,6 +296,8 @@ try {
     console.log('MODE_MENU', await mobile.locator('body').ariaSnapshot());
     await mobile.keyboard.press('Escape');
   }
+  if (extended) await (await import('./extended-flow.mjs')).extendedFlow({ desktop, mobile, seed });
+  if (longHistory) await (await import('./history-flow.mjs')).historyFlow({ desktop, mobile });
   await mobile.screenshot({ path: 'test/real-host-mobile.png', fullPage: true });
   await desktop.getByRole('button', { name: '复制链接', exact: true }).click();
   await desktop.getByRole('button', { name: '已复制', exact: true }).waitFor({ timeout: 5000 });
@@ -291,6 +311,7 @@ try {
   console.log('PASS: original ZCode page -> official relay -> real DSH session/agent/persistence -> original page. Model output: deterministic replay, no live API call.');
   if (crossModels) console.log(logs.split('\n').filter(l => l.includes('NTR_TEST_COMMAND')).join('\n'));
 } catch (error) {
+  if (mobile && await mobile.getByRole('button', { name: '展开详情', exact: true }).isVisible()) await mobile.getByRole('button', { name: '展开详情', exact: true }).click();
   if (mobile) { console.log('MOBILE_BODY', (await mobile.locator('body').innerText()).slice(0, 5000)); await mobile.screenshot({ path: 'test/real-host-failure.png', fullPage: true }); }
   console.log(logs.replace(/https?:\S+/g, '[url]').slice(-12000));
   throw error;

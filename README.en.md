@@ -10,20 +10,25 @@ Open DSH Settings > Dsh ntr Zcode, select the workspaces to share, acknowledge r
 
 The original page's session IDs are mapped to DSH session IDs. Prompts execute in the existing DSH agent with its existing permissions. Model and reasoning choices are read from DSH's real model catalog; no API keys or provider endpoints are sent to the mobile page. As in the original ZCode page, draft choices take effect when sending the next message. DSH's standard model-selection API also updates its default model in the background, just as the desktop selector does.
 
-## Supported In 0.3.0
+## Supported In 0.4.0
 
 - Explicitly selected, registered DSH workspaces and their existing sessions.
 - New sessions in shared workspaces, including the original page's draft/prewarm creation.
 - Selection of existing DSH models and their actual supported reasoning levels.
-- Recent text history (up to 200 DSH messages), live text updates and final responses.
+- Paged text history, live text updates and final responses. Chrome verified 230 durable DSH messages.
 - Text and image submission to idle sessions and stopping the current task.
-- PNG/JPEG/WebP/GIF uploads through ZCode's original begin/chunk/commit SHA-256 protocol, with DSH validation, durable storage and history previews. Up to four images per message, 8 MiB per image; HEIC, SVG, video, audio and generic files are not supported. Model vision capability is still required for image understanding.
+- PNG/JPEG/WebP/GIF and generic file uploads through the original chunk/checksum protocol and DSH durable receipts. Up to four attachments per message, 8 MiB each. Raster images have history previews. HEIC/SVG image decoding and general file history previews are not supported; attaching audio/video as files does not imply playback or model understanding.
 - Real DSH permission changes when explicitly enabled in local plugin settings. Web draft changes apply on submission, like model choices.
 - Start, stop, refresh QR code, and copy link in DSH Settings.
 - Request deduplication for the lifetime of the current pairing; unsupported remote mutations fail explicitly.
 - Restoring the active shared session after reloading the mobile page.
+- Opt-in remote approval (allow once/reject) and structured questions. Disconnect or a 120-second timeout returns ownership to the desktop, never automatic approval. Timed questions retain DSH deadlines and support one bounded snooze.
+- Real queued submissions, withdraw/edit/delete, and next-step steering. Immediate stop-and-send, queue reordering and auto-drain suspension remain unsupported.
+- DSH plan mode, todo projection, goal creation/pause/resume, and pausing active goals when stopping generation. Goal completion is not a ZCode independent verification result; goal timing/verification history is not mapped.
+- Assistant-message forks, pin/unpin, archive/unarchive and desktop directory updates pushed to the phone.
+- Tool input/output, live and durable reasoning text, context/token counters, and canonical manual compaction with a completion marker. Live reasoning is unit-tested, not Chrome-verified.
 
-New workspace directories, older-history pagination, non-image attachments, tool output details, remote approval dialogs, terminal/file access, provider credential management, collaboration modes, plans, queues and goals are not implemented. Approvals must be handled on the desktop. Usage counters are not mapped. Original ZCode controls outside the supported subset may remain visible and report unsupported operations. They must not be interpreted as verified DSH features. Refresh the mobile directory to discover desktop-side session additions.
+This is NOT full ZCode feature parity. New workspace directories, terminal/file explorer/Git review, provider credentials/global settings, MCP/Skills/plugin administration, bots and subagent controls remain unsupported. Original controls may still be visible. Remote approval requires a separate local opt-in before pairing; requests already owned by the desktop stay there. Stopping a DSH turn retains the queue rather than pausing its automatic consumption. See the verification matrix for implemented, tested and unsupported controls.
 
 Cross-project navigation uses the original mobile home: return to the task home and choose the shared project there. The inline project picker lists the current bridge's local tabs, not every shared DSH workspace.
 
@@ -39,7 +44,7 @@ Enable the local checkbox allowing remote permission changes **before starting p
 
 GLM reasoning choices reflect the desktop catalog. A GLM entry configured with only `max` has no alternative level to choose; the plugin does not invent unsupported levels.
 
-Pending images are pairing/workspace/session scoped, limited to 24 MiB total and expire after ten minutes. A successful send frees upload buffers; DSH retains the durable image. Stop/refresh clears pending uploads. Remote image reads use DSH's session attachment authorization, never a client-supplied filesystem path.
+Pending attachments are pairing/workspace/session scoped, limited to 24 MiB total and expire after ten minutes. A successful send frees upload buffers; DSH retains durable data. Stop/refresh clears pending uploads. Reads validate durable session references, never client-supplied filesystem paths.
 
 ## Security And Expiry
 
@@ -59,6 +64,8 @@ Pending images are pairing/workspace/session scoped, limited to 24 MiB total and
 - `node test/real-host.mjs --live`: original mobile page, official relay, real isolated DSH profile, agent and persistence, with deterministic official LLM replay (no paid API calls). Requires the built sibling DSH source checkout and Chrome/Playwright.
 - Add `--flows` for new-session, real model/reasoning selection, stop/continue, directory return and reload regression coverage.
 - Add `--features` for GLM to DeepSeek-account selection, all three permission mappings, original chunked image upload, durable image history and preview after reload.
+- Run `--extended` separately for approvals, questions, queue editing/deletion, generic files, forks, live directory updates, plans/todos, goals and pin/archive controls.
+- Run `--history` separately for 230-message scrolling and actual DSH compaction checkpoints. It seeds only synthetic messages in the isolated profile.
 
 No test reads the user's existing DSH profile. These tests do not establish actual iPhone/Safari behavior or paid model-provider availability.
 

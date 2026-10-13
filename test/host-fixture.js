@@ -1,11 +1,12 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { Bridge } from '../lib/bridge.js';
 import { DshBackend } from '../lib/dsh.js';
-export const inject = ['connection', 'webServer', 'sessionController', 'workspaceController', 'sessions'];
+export const inject = ['connection', 'webServer', 'sessionController', 'workspaceController', 'sessions', 'approval', 'userQuestions'];
 export async function apply(ctx) {
   if (process.env.DSH_NTR_ISOLATED_TEST !== '1') throw new Error('Fixture requires an isolated test profile');
-  for (const method of ['checkMode', 'selectModel', 'prompt', 'image']) {
+  for (const method of ['checkMode', 'selectModel', 'prompt', 'image', 'queue', 'execute', 'fork', 'membershipAction']) {
     const original = DshBackend.prototype[method];
     DshBackend.prototype[method] = async function (...args) {
       try { return await original.apply(this, args); }
@@ -13,13 +14,62 @@ export async function apply(ctx) {
     };
   }
   const command = Bridge.prototype.command;
+  const call = Bridge.prototype.call;
+  Bridge.prototype.call = async function (...args) {
+    try { return await call.apply(this, args); }
+    catch (error) { console.log('NTR_TEST_RPC_ERROR', args[0], args[1], error.message); throw error; }
+  };
   Bridge.prototype.command = async function (raw) {
-    const result = await command.call(this, raw);
+    let result;
+    try { result = await command.call(this, raw); }
+    catch (error) { console.log('NTR_TEST_PARSE_ERROR', raw.type, raw.payload, error.message); throw error; }
     console.log('NTR_TEST_COMMAND', JSON.stringify({ type: raw.type, keys: Object.keys(raw.payload ?? {}),
-      selection: raw.payload?.modelSelection, config: raw.payload?.config, status: result.status, reason: result.reasonCode }));
+      selection: raw.payload?.modelSelection, config: raw.payload?.config, status: result.status, reason: result.reasonCode,
+      baseRevision: raw.baseRevision, epochMatches: raw.baseLogEpoch === this.epoch, actualRevision: [...this.subs.values()].find(s => s.conversation?.summary.sessionId === raw.sessionId)?.conversation.seq }));
     return result;
   };
   let sessionId;
+  ctx.effect(() => ctx.connection.fetch.register({ path: '/api/plugins/ntr-test/long-history', methods: ['POST'], requestBody: 'buffered', fetch: async () => {
+    const { createUserMessage } = await import(pathToFileURL(join(process.env.DSH_NTR_SOURCE, 'packages/llm/llm/lib/index.js')).href);
+    const created = { sessionId };
+    const session = ctx.sessions.get(created.sessionId);
+    const lastTurn = session.snapshotEvents().filter(e => e.type === 'turn/start').at(-1)?.data.turn ?? 0;
+    for (let i = 0; i < 230; i++) {
+      session.append('turn/start', { turn: lastTurn + i + 1 });
+      session.append('user/message', createUserMessage({ content: [{ type: 'text', text: `NTR history marker ${String(i).padStart(3, '0')}` }], source: { kind: 'user' } }), { surfaceOp: 'append' });
+      session.append('turn/end', { turn: lastTurn + i + 1, reason: { kind: 'completed' } });
+    }
+    await ctx.sessionController.rename({ sessionId: created.sessionId, title: 'NTR Long History' });
+    await ctx.sessions.flush(session);
+    return Response.json(created);
+  } }), 'Isolated fixture long durable history');
+  ctx.effect(() => ctx.connection.fetch.register({ path: '/api/plugins/ntr-test/rename', methods: ['POST'], requestBody: 'buffered', fetch: async request => {
+    const input = await request.json();
+    const known = await ctx.sessionController.list({}, AbortSignal.timeout(15000));
+    if (!known.items.some(s => s.sessionId === input.sessionId) || !/^NTR [\w ]{1,60}$/.test(input.title)) return new Response('Invalid fixture rename', { status: 400 });
+    await ctx.sessionController.rename(input);
+    return Response.json({ ok: true });
+  } }), 'Isolated fixture desktop rename');
+  const interactions = new Map();
+  ctx.effect(() => ctx.connection.fetch.register({ path: '/api/plugins/ntr-test/interaction', methods: ['POST', 'GET'], requestBody: 'buffered', fetch: async request => {
+    if (request.method === 'GET') return Response.json(Object.fromEntries(interactions));
+    const input = await request.json();
+    if (input.sessionId !== sessionId) return new Response('Fixture session only', { status: 403 });
+    const resolved = await ctx.sessionController.resolveAgent(sessionId);
+    if (resolved.error) throw resolved.error;
+    const id = crypto.randomUUID();
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 60000);
+    const promise = input.kind === 'permission'
+      ? ctx.approval.request({ agent: resolved.agent, toolName: 'NTR_safe_test', reason: 'Approve this isolated test only; no file or command will run.', signal: abort.signal })
+      : ctx.userQuestions.ask({ agent: resolved.agent, signal: abort.signal, questions: [
+        { id: 'choice', header: 'Pick', question: 'Choose the fixture color', options: [{ label: 'Red' }, { label: 'Blue' }] },
+        { id: 'note', header: 'Note', question: 'Write a fixture note' },
+      ] });
+    interactions.set(id, { state: 'waiting', kind: input.kind });
+    void promise.then(value => interactions.set(id, { state: 'done', value }), error => interactions.set(id, { state: 'error', error: error.message })).finally(() => clearTimeout(timer));
+    return Response.json({ id });
+  } }), 'Isolated fixture human interactions');
   ctx.effect(() => ctx.connection.fetch.register({ path: '/api/plugins/ntr-test/seed', methods: ['POST'], requestBody: 'buffered', fetch: async request => {
     if (new URL(request.url).searchParams.has('blank')) await ctx.workspaceController.create({ path: join(process.env.DSH_HOME, 'second-project') });
     const { workspace } = await ctx.workspaceController.create({ path: process.env.DSH_NTR_TEST_WORKSPACE });
@@ -30,7 +80,10 @@ export async function apply(ctx) {
     return Response.json({ sessionId, workspaceId: workspace.workspaceId });
   } }), 'Isolated fixture seed');
   ctx.effect(() => ctx.connection.fetch.register({ path: '/api/plugins/ntr-test/directory', methods: ['GET'], requestBody: 'buffered', fetch: async () => {
-    return Response.json({ sessions: (await ctx.sessionController.list({}, AbortSignal.timeout(15000))).items });
+    const stop = new AbortController();
+    const iterator = ctx.workspaceController.follow(stop.signal)[Symbol.asyncIterator]();
+    try { const membership = (await iterator.next()).value; return Response.json({ sessions: (await ctx.sessionController.list({}, AbortSignal.timeout(15000))).items, membership }); }
+    finally { stop.abort(); await iterator.return?.(); }
   } }), 'Isolated fixture directory');
   ctx.effect(() => ctx.connection.fetch.register({ path: '/api/plugins/ntr-test/history', methods: ['GET'], requestBody: 'buffered', fetch: async request => {
     const id = new URL(request.url).searchParams.get('sessionId');
