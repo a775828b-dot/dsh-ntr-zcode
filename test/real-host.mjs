@@ -362,6 +362,7 @@ try {
   if (queueFlow) await (await import('./queue-flow.mjs')).queueFlow({ desktop, mobile, seed, imageBytes });
   if (flows && process.argv.includes('--audit')) await (await import('./button-audit.mjs')).buttonAudit({ desktop, mobile, seed });
   if (longHistory) await (await import('./history-flow.mjs')).historyFlow({ desktop, mobile });
+  if (process.argv.includes('--previews')) await (await import('./preview-flow.mjs')).previewFlow({ desktop, mobile, seed });
   await mobile.screenshot({ path: 'test/real-host-mobile.png', fullPage: true });
   await desktop.getByRole('button', { name: '复制链接', exact: true }).click();
   await desktop.getByRole('button', { name: '已复制', exact: true }).waitFor({ timeout: 5000 });

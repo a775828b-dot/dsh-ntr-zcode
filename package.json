@@ -1,6 +1,6 @@
 {
   "name": "dsh-ntr-zcode",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Dsh ntr Zcode - ZCode remote web protocol adapter for the existing DSH Host",
   "type": "module",
   "main": "lib/index.js",
@@ -11,7 +11,7 @@
   "bugs": { "url": "https://github.com/a775828b-dot/dsh-ntr-zcode/issues" },
   "engines": { "node": ">=22" },
   "scripts": { "build:vendor": "node build-vendor.mjs", "test": "node --test test/*.test.mjs" },
-  "dependencies": { "qrcode": "1.5.4" },
+  "dependencies": { "mdast-util-from-markdown": "2.0.2", "qrcode": "1.5.4" },
   "devDependencies": { "esbuild": "0.28.1", "zod": "4.6.5" },
   "license": "Apache-2.0",
   "dsh": { "bundle": { "patch": "./cordis.patch.yml" }, "client": { "platform": "web", "inject": [] } }

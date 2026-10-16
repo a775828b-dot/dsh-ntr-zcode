@@ -2,7 +2,7 @@
 
 [中文](README.md)
 
-Experimental protocol adapter. Version 0.5.0 queue controls are verified against the DSH 0.2.1-alpha.2 source Host; see the [queue verification record](test/queue-0.5.0.md). Earlier 0.4.1 compatibility results are recorded [separately](test/compatibility-0.2.1-alpha.2.md). This is an independent plugin, not an official ZCode product. It does not modify DSH or run a second agent.
+Experimental protocol adapter. Version 0.6.0 targets the DSH 0.2.1-alpha.2 source Host; see the [image/file verification record](test/previews-0.6.0.md) and [queue verification record](test/queue-0.5.0.md). Earlier 0.4.1 compatibility results are recorded [separately](test/compatibility-0.2.1-alpha.2.md). This is an independent plugin, not an official ZCode product. It does not modify DSH or run a second agent.
 
 ## Introduction Video
 
@@ -14,14 +14,16 @@ Open DSH Settings > Dsh ntr Zcode, select the workspaces to share, acknowledge r
 
 The original page's session IDs are mapped to DSH session IDs. Prompts execute in the existing DSH agent with its existing permissions. Model and reasoning choices are read from DSH's real model catalog; no API keys or provider endpoints are sent to the mobile page. As in the original ZCode page, draft choices take effect when sending the next message. DSH's standard model-selection API also updates its default model in the background, just as the desktop selector does.
 
-## Supported In 0.5.0
+## Supported In 0.6.0
 
 - Explicitly selected, registered DSH workspaces and their existing sessions.
 - New sessions in shared workspaces, including the original page's draft/prewarm creation.
 - Selection of existing DSH models and their actual supported reasoning levels.
 - Paged text history, live text updates and final responses. Chrome verified 230 durable DSH messages.
 - Text and image submission to idle sessions and stopping the current task.
-- PNG/JPEG/WebP/GIF and generic file uploads through the original chunk/checksum protocol and DSH durable receipts. Up to four attachments per message, 8 MiB each. Raster images have history previews. HEIC/SVG image decoding and general file history previews are not supported; attaching audio/video as files does not imply playback or model understanding.
+- PNG/JPEG/WebP/GIF and generic file uploads through the original chunk/checksum protocol and DSH durable receipts. Up to four attachments per message, 8 MiB each. Raster images have history previews. HEIC/SVG decoding and audio/video playback remain unsupported.
+- Assistant/tool durable output images use the original image preview; tool images are explicitly labeled. Markdown image/file links are read through DSH's file service only when referenced by a subscribed shared session and contained within its shared workspace. No arbitrary filesystem access, directory browsing or mutations.
+- Durable file attachments receive supplemental, explicitly labeled preview links without changing original user text or attachment identity. Text previews are supported; other formats depend on the original viewer and are not universally verified. Maximum file size is 8 MiB, with 256 KiB text/range reads. Hidden paths, UNC paths and resolved workspace escapes are rejected. Merely mentioning a path in tool text does not publish that file.
 - Real DSH permission changes when explicitly enabled in local plugin settings. Web draft changes apply on submission, like model choices.
 - Start, stop, refresh QR code, and copy link in DSH Settings.
 - Request deduplication for the lifetime of the current pairing; unsupported remote mutations fail explicitly.
